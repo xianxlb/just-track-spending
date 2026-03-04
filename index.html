@@ -1,0 +1,2055 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; font-src 'self'; img-src 'none'; connect-src 'none'; form-action 'none';">
+<title>Xian Expense Tracker</title>
+<script src="lib/xlsx.full.min.js"></script>
+<style>
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 300 700;
+  font-display: swap;
+  src: url(fonts/jetbrains-mono-latin-ext.woff2) format('woff2');
+  unicode-range: U+0100-02AF, U+0304, U+0308, U+0329, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 300 700;
+  font-display: swap;
+  src: url(fonts/jetbrains-mono-latin.woff2) format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --bg: #0a0a0a;
+  --text: #e5e5e5;
+  --muted: #666;
+  --accent: #F59E0B;
+  --border: #222;
+  --surface: #111;
+  --hover: #1a1a1a;
+  --font: 'JetBrains Mono', monospace;
+  --cat-food: #F59E0B;
+  --cat-transport: #3B82F6;
+  --cat-groceries: #10B981;
+  --cat-subscriptions: #8B5CF6;
+  --cat-shopping: #EC4899;
+  --cat-health: #14B8A6;
+  --cat-travel: #F97316;
+  --cat-insurance: #6366F1;
+  --cat-entertainment: #E879F9;
+  --cat-loans: #A78BFA;
+  --cat-uncategorized: #666;
+}
+
+html { font-size: 13px; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  line-height: 1.6;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--accent);
+  color: var(--bg);
+}
+
+/* ── LAYOUT ──────────────────────────── */
+
+.container {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 3rem 2rem;
+}
+
+.header {
+  margin-bottom: 3rem;
+}
+
+.header h1 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+
+.header h1 span {
+  color: var(--accent);
+}
+
+.header .subtitle {
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin-top: 0.25rem;
+  font-weight: 300;
+}
+
+/* ── SECTION HEADERS ─────────────────── */
+
+.section-header {
+  text-transform: uppercase;
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.section-header::before {
+  content: '──';
+  color: var(--border);
+}
+
+.section-header::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+/* ── DROP ZONE ───────────────────────── */
+
+.drop-zone {
+  border: 1px dashed var(--border);
+  padding: 3rem 2rem;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+  position: relative;
+}
+
+.drop-zone:hover,
+.drop-zone.dragover {
+  border-color: var(--accent);
+  background: rgba(245, 158, 11, 0.03);
+}
+
+.drop-zone-icon {
+  font-size: 2rem;
+  margin-bottom: 1rem;
+  color: var(--muted);
+  font-weight: 300;
+}
+
+.drop-zone-text {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.drop-zone-text strong {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.drop-zone-hint {
+  color: var(--border);
+  font-size: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.drop-zone input[type="file"] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+/* ── FILE CHIPS ──────────────────────── */
+
+.file-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.file-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.3rem 0.7rem;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  font-size: 0.75rem;
+  color: var(--text);
+}
+
+.file-chip .chip-count {
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.file-chip .chip-remove {
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 0.85rem;
+  line-height: 1;
+}
+
+.file-chip .chip-remove:hover {
+  color: #EF4444;
+}
+
+/* ── PREVIEW TABLE ───────────────────── */
+
+.preview-section {
+  margin-top: 2rem;
+  display: none;
+}
+
+.preview-section.visible { display: block; }
+
+.preview-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.preview-count {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.preview-count span {
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.btn {
+  font-family: var(--font);
+  font-size: 0.8rem;
+  padding: 0.5rem 1.25rem;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 500;
+  transition: border-color 0.2s, color 0.2s;
+}
+
+.btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.btn-primary {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.btn-primary:hover {
+  background: var(--accent);
+  color: var(--bg);
+}
+
+.btn-group {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.preview-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.preview-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+}
+
+.preview-table th {
+  text-align: left;
+  padding: 0.5rem 0.75rem;
+  background: var(--surface);
+  color: var(--muted);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 0.7rem;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.preview-table td {
+  padding: 0.4rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.preview-table tr:hover td {
+  background: var(--hover);
+}
+
+.amount-debit { color: var(--accent); }
+.amount-credit { color: #10B981; }
+
+/* ── DASHBOARD ───────────────────────── */
+
+#dashboard { display: none; }
+#dashboard.visible { display: block; }
+
+.nav-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 2rem;
+}
+
+.nav-tab {
+  font-family: var(--font);
+  font-size: 0.8rem;
+  padding: 0.6rem 1.25rem;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--muted);
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 500;
+  transition: color 0.2s, border-color 0.2s;
+}
+
+.nav-tab:hover { color: var(--text); }
+
+.nav-tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+.tab-content { display: none; }
+.tab-content.visible { display: block; }
+
+/* ── MONTHLY BREAKDOWN ───────────────── */
+
+.month-block {
+  margin-bottom: 2.5rem;
+}
+
+.month-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.month-header::before {
+  content: '──';
+  color: var(--border);
+}
+
+.month-header::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.month-header .month-total {
+  color: var(--accent);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.category-row {
+  display: grid;
+  grid-template-columns: 1.5rem 11rem 7rem 4rem 1fr;
+  align-items: center;
+  padding: 0.35rem 0;
+  cursor: pointer;
+  transition: background 0.15s;
+  padding-left: 0.5rem;
+  gap: 0.25rem;
+}
+
+.category-row:hover {
+  background: var(--hover);
+}
+
+.cat-indicator {
+  width: 4px;
+  height: 14px;
+  display: inline-block;
+}
+
+.category-name {
+  color: var(--text);
+  font-weight: 400;
+  font-size: 0.85rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.category-amount {
+  color: var(--accent);
+  font-weight: 500;
+  text-align: right;
+  font-size: 0.85rem;
+}
+
+.category-pct {
+  color: var(--muted);
+  text-align: right;
+  font-size: 0.8rem;
+}
+
+.category-bar {
+  font-size: 0.85rem;
+  letter-spacing: -0.02em;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+/* ── TRANSACTION DRILL-DOWN ──────────── */
+
+.transactions-list {
+  display: none;
+  margin-left: 1.75rem;
+  border-left: 1px solid var(--border);
+  padding-left: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.transactions-list.expanded { display: block; }
+
+.transaction-row {
+  display: grid;
+  grid-template-columns: 6.5rem 1fr 6rem 8rem;
+  align-items: center;
+  padding: 0.3rem 0;
+  font-size: 0.8rem;
+  gap: 0.5rem;
+}
+
+.transaction-row:hover {
+  background: var(--hover);
+}
+
+.tx-date { color: var(--muted); }
+
+.tx-merchant {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tx-amount {
+  color: var(--accent);
+  text-align: right;
+  font-weight: 500;
+}
+
+.tx-category-select {
+  font-family: var(--font);
+  font-size: 0.75rem;
+  background: var(--surface);
+  color: var(--muted);
+  border: 1px solid var(--border);
+  padding: 0.15rem 0.35rem;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  text-align: right;
+}
+
+.tx-category-select:hover,
+.tx-category-select:focus {
+  border-color: var(--accent);
+  color: var(--text);
+  outline: none;
+}
+
+/* ── CREDITS SECTION ─────────────────── */
+
+.credits-section {
+  margin-top: 1.5rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.credits-header {
+  color: #10B981;
+  font-size: 0.8rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.5rem;
+}
+
+.credit-row {
+  display: grid;
+  grid-template-columns: 6.5rem 1fr 6rem;
+  font-size: 0.8rem;
+  padding: 0.2rem 0;
+  gap: 0.5rem;
+}
+
+.credit-row .tx-date { color: var(--muted); }
+.credit-row .tx-amount { color: #10B981; }
+
+.transfers-section {
+  margin-top: 1.5rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.transfers-header {
+  color: #6366F1;
+  font-size: 0.8rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.5rem;
+}
+
+.transfer-row {
+  display: grid;
+  grid-template-columns: 6.5rem 1fr 6rem;
+  font-size: 0.8rem;
+  padding: 0.2rem 0;
+  gap: 0.5rem;
+}
+
+.transfer-row .tx-date { color: var(--muted); }
+.transfer-row .tx-amount { color: #6366F1; }
+
+/* ── SUMMARY TAB ─────────────────────── */
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+  margin-bottom: 2rem;
+}
+
+@media (max-width: 640px) {
+  .summary-grid { grid-template-columns: 1fr; }
+}
+
+.stat-block {
+  border: 1px solid var(--border);
+  padding: 1.25rem;
+}
+
+.stat-label {
+  color: var(--muted);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 0.35rem;
+}
+
+.stat-value {
+  color: var(--accent);
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.stat-sub {
+  color: var(--muted);
+  font-size: 0.75rem;
+  margin-top: 0.25rem;
+}
+
+.summary-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+  margin-top: 1rem;
+}
+
+.summary-table th {
+  text-align: left;
+  padding: 0.5rem 0.75rem;
+  color: var(--muted);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 0.7rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.summary-table th:last-child,
+.summary-table td:last-child {
+  text-align: right;
+}
+
+.summary-table td {
+  padding: 0.4rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.summary-table .highlight td {
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.top-categories .rank {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+/* ── RECURRING TAB ───────────────────── */
+
+.recurring-card {
+  border: 1px solid var(--border);
+  padding: 1rem;
+  margin-bottom: 0.75rem;
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.recurring-merchant {
+  font-weight: 500;
+  font-size: 0.85rem;
+}
+
+.recurring-merchant .recurring-category {
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 400;
+  margin-top: 0.15rem;
+}
+
+.recurring-freq {
+  color: var(--muted);
+  font-size: 0.8rem;
+  text-align: center;
+}
+
+.recurring-cost {
+  text-align: right;
+}
+
+.recurring-monthly {
+  color: var(--accent);
+  font-weight: 500;
+  font-size: 0.9rem;
+}
+
+.recurring-annual {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.recurring-total {
+  border-top: 1px solid var(--border);
+  padding-top: 1rem;
+  margin-top: 0.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.recurring-total-label {
+  color: var(--muted);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.recurring-total-amount {
+  color: var(--accent);
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.recurring-total-annual {
+  color: var(--muted);
+  font-size: 0.8rem;
+  margin-left: 1rem;
+}
+
+/* ── EMPTY STATE ─────────────────────── */
+
+.empty-state {
+  text-align: center;
+  padding: 2rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+/* ── TOOLBAR ─────────────────────────── */
+
+.toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.file-info {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.file-info strong {
+  color: var(--text);
+  font-weight: 500;
+}
+
+/* ── SCANLINE EFFECT ─────────────────── */
+
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.03) 2px,
+    rgba(0, 0, 0, 0.03) 4px
+  );
+  z-index: 9999;
+}
+
+/* ── FADE IN ─────────────────────────── */
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.fade-in {
+  animation: fadeIn 0.3s ease forwards;
+}
+
+/* ── RESPONSIVE ──────────────────────── */
+
+@media (max-width: 768px) {
+  .container { padding: 1.5rem 1rem; }
+
+  .category-row {
+    grid-template-columns: 1.5rem 8rem 5.5rem 3.5rem 1fr;
+    font-size: 0.8rem;
+  }
+
+  .transaction-row {
+    grid-template-columns: 5rem 1fr 5rem;
+  }
+
+  .tx-category-select { display: none; }
+
+  .recurring-card {
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+  }
+}
+
+/* ── PASSPHRASE MODAL ────────────────── */
+
+.passphrase-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  z-index: 1000;
+  justify-content: center;
+  align-items: center;
+}
+
+.passphrase-overlay.visible {
+  display: flex;
+}
+
+.passphrase-modal {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 2.5rem;
+  width: 100%;
+  max-width: 360px;
+  text-align: center;
+}
+
+.passphrase-icon {
+  font-size: 2rem;
+  margin-bottom: 1rem;
+  filter: grayscale(1);
+}
+
+.passphrase-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: var(--text);
+  margin-bottom: 0.5rem;
+}
+
+.passphrase-desc {
+  font-size: 0.75rem;
+  color: var(--muted);
+  margin-bottom: 1.5rem;
+  line-height: 1.5;
+}
+
+.passphrase-input {
+  display: block;
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 0.85rem;
+  padding: 0.6rem 0.8rem;
+  margin-bottom: 0.75rem;
+  outline: none;
+  letter-spacing: 0.15em;
+}
+
+.passphrase-input:focus {
+  border-color: var(--accent);
+}
+
+.passphrase-error {
+  color: #EF4444;
+  font-size: 0.75rem;
+  min-height: 1.2rem;
+  margin-bottom: 0.5rem;
+}
+
+.passphrase-submit {
+  background: var(--accent);
+  color: var(--bg);
+  border: none;
+  font-family: var(--font);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  padding: 0.6rem 2rem;
+  cursor: pointer;
+  width: 100%;
+}
+
+.passphrase-submit:hover {
+  opacity: 0.9;
+}
+</style>
+</head>
+<body>
+
+<!-- PASSPHRASE MODAL -->
+<div id="passphrase-overlay" class="passphrase-overlay">
+  <div class="passphrase-modal">
+    <div class="passphrase-icon">&#x1f512;</div>
+    <div id="passphrase-title" class="passphrase-title">SET PASSPHRASE</div>
+    <div id="passphrase-desc" class="passphrase-desc">Your transaction data will be encrypted before saving.</div>
+    <input type="password" id="passphrase-input" class="passphrase-input" placeholder="enter passphrase" autocomplete="off" spellcheck="false">
+    <input type="password" id="passphrase-confirm" class="passphrase-input" placeholder="confirm passphrase" autocomplete="off" spellcheck="false">
+    <div id="passphrase-error" class="passphrase-error"></div>
+    <button id="passphrase-submit" class="passphrase-submit">UNLOCK</button>
+  </div>
+</div>
+
+<div class="container">
+  <!-- HEADER -->
+  <div class="header">
+    <h1><span>$</span> XIAN EXPENSE TRACKER</h1>
+    <div class="subtitle">drop your bank csvs. everything stays local.</div>
+  </div>
+
+  <!-- UPLOAD -->
+  <div id="upload-section">
+    <div class="section-header">Upload CSV</div>
+    <div class="drop-zone" id="drop-zone">
+      <input type="file" accept=".csv,.xls,.xlsx" id="file-input" multiple>
+      <div class="drop-zone-icon">&gt;_</div>
+      <div class="drop-zone-text"><strong>Drop CSVs here</strong> or click to browse</div>
+      <div class="drop-zone-hint">DBS (.csv) / UOB (.xls) statement exports &middot; multiple files OK</div>
+    </div>
+
+    <div class="file-chips" id="file-chips"></div>
+
+    <!-- PREVIEW -->
+    <div class="preview-section" id="preview-section">
+      <div class="preview-info">
+        <div class="preview-count"><span id="tx-count">0</span> transactions parsed &middot; <span id="dupe-count">0</span> duplicates removed</div>
+        <div class="btn-group">
+          <button class="btn" id="btn-cancel">Clear</button>
+          <button class="btn btn-primary" id="btn-analyze">Analyze</button>
+        </div>
+      </div>
+      <div class="preview-table-wrap">
+        <table class="preview-table" id="preview-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Description</th>
+              <th>Type</th>
+              <th>Debit</th>
+              <th>Credit</th>
+              <th>Category</th>
+            </tr>
+          </thead>
+          <tbody id="preview-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- DASHBOARD -->
+  <div id="dashboard">
+    <div class="toolbar">
+      <div class="file-info">
+        <strong id="file-name"></strong> &middot; <span id="dash-tx-count"></span> transactions
+      </div>
+      <button class="btn" id="btn-new">New File</button>
+    </div>
+
+    <nav class="nav-tabs">
+      <button class="nav-tab active" data-tab="monthly">Monthly</button>
+      <button class="nav-tab" data-tab="summary">Summary</button>
+      <button class="nav-tab" data-tab="recurring">Recurring</button>
+    </nav>
+
+    <div class="tab-content visible" id="tab-monthly"></div>
+    <div class="tab-content" id="tab-summary"></div>
+    <div class="tab-content" id="tab-recurring"></div>
+  </div>
+</div>
+
+<script>
+// ── CATEGORY DEFINITIONS ────────────────────
+// Order matters: first match wins. More specific patterns before general ones.
+
+const CATEGORIES = [
+  // Transfers — exclude from spend totals (treated like credits)
+  { name: 'Transfer', color: 'var(--cat-uncategorized)', keywords: [
+    'PAYNOW TRANSFER', 'TOP-UP TO PAYLAH', 'SEND BACK FROM PAYLAH',
+    'MB6', 'IB6', 'MB5', 'IB5',  // DBS bank transfer codes
+    'DTL BT PANJANG',  // ATM
+    'INCOMING PAYNOW',
+    'BILL PAYMENT',  // UOB bill payment
+    'INWARD DEBIT-FAST',  // UOB inward transfer
+    'MISC DEBIT (SRS)',  // SRS contribution
+  ]},
+  // Tax & Bills
+  { name: 'Tax & Bills', color: 'var(--cat-loans)', keywords: [
+    'IRAS ITX', 'IRAS PROPERTY TAX',
+    'MARSILING-YEWTEE', 'TOWN COUNCIL',
+    'LUCE MAINTENANCE',  // UOB condo maintenance
+    'SINGAPORE TELECOMMU',  // Singtel
+  ]},
+  // Transport must come before Food so GRAB RIDES matches first
+  { name: 'Transport', color: 'var(--cat-transport)', keywords: [
+    'GRAB RIDES', 'GRAB*TRANS', 'GRAB*R-', 'GRAB * R-',
+    'GOJEK', 'TADA', 'WWW.TADA', 'COMFORT', 'CDGTAXI', 'CDG ZIG',
+    'BUS/MRT', 'TRANSIT LINK', 'EZ-LINK', 'EZLINK', 'SMRT', 'SBS TRANSIT',
+    'UBER RIDES', 'CAREEM RIDE',
+    'MTA*NYCT', 'KORAIL', 'EAST JAPAN RAILWAY', 'MOBILE SUICA',
+    'RTA MARINE', 'BT BATOK DR',
+  ]},
+  { name: 'Food & Drink', color: 'var(--cat-food)', keywords: [
+    'GRAB* A-', 'GRAB*A-', 'GRAB* L', 'GRAB-EC', 'GRAB*FOOD',
+    'CAREEM FOOD', 'FOODPANDA', 'DELIVEROO',
+    'KOO KEE', 'XIANG XIANG', 'SALMON WARRIOR', 'STUFF\'D', 'YA KUN',
+    'TAKAGI RAMEN', 'HANSANG', 'ACORN NAPIER', 'CHATERAISE', 'KOUFU',
+    'SG HAWKER', 'ENCIK TAN', 'TOFUG', 'JIN YU MAN TANG',
+    'MCDONALDS', 'MCD ', 'KOPITIAM', 'TOAST BOX', 'STARBUCKS',
+    'BURGER', 'PIZZA', 'KFC', 'SUBWAY', 'JOLLIBEAN', 'MR BEAN',
+    'LIHO', 'GONGCHA', 'OLD CHANG KEE', 'PASTAMANIA', 'SWENSEN',
+    'YOCHI', 'IN-N-OUT', 'MEI LAI WAH', 'BONDI SUSHI', 'L?INDUSTRIE',
+    'SLICE*', 'LA COLOMBE', 'EREWHON', 'DLR RONTO', 'PANG DA FU',
+    'BAR OUTLANDER', 'FUL TAIPEI', 'STOMPING GROUNDS CAFE',
+    'AIA/KIMCHI', 'MY AWESOME CAFE', 'NAEUM',
+    'AJUMMAS', 'KUAN ZHAI', 'GLASSHOUSE NEIL',
+    'YASUKEZUSHI', 'TATIGUIMENYAHIRO', 'CHIKUFUUDOU', 'ISHIIMISO',
+    'MANEKI SKYTREE',
+    'SIN TONG AH', 'HAPPY TEOCH',
+    'RAMEN', 'SUSHI', 'CAFE', 'RESTAURANT', 'DINING', 'HAWKER', 'FOOD COURT',
+  ]},
+  { name: 'Groceries', color: 'var(--cat-groceries)', keywords: [
+    'FAIRPRICE', 'NTUC', 'COLD STORAGE', 'GIANT', 'SHENG SIONG',
+    'DON DON DONKI', 'DONKI', 'REDMART', 'HAO MART',
+    '7-ELEVEN', '7 ELEVEN',
+  ]},
+  { name: 'Insurance', color: 'var(--cat-insurance)', keywords: [
+    'PRUDENTIAL', 'FWD SINGAPORE', 'AIA ', 'GREAT EASTERN', 'NTUC INCOME',
+  ]},
+  { name: 'Subscriptions', color: 'var(--cat-subscriptions)', keywords: [
+    'CLAUDE.AI', 'ANTHROPIC',
+    'GOOGLE*YOUTUBE', 'YOUTUBE PREMIUM',
+    'APPLE.COM/BILL', 'APPLE COM',
+    'GOMO MOBILE', 'GOMO ',
+    'NETFLIX', 'SPOTIFY', 'DISNEY+',
+    'CHATGPT', 'OPENAI',
+    'X CORP', 'ABOUT.X.COM',
+    'ICLOUD', 'MICROSOFT', 'ADOBE', 'NOTION', 'FIGMA', 'GITHUB',
+  ]},
+  { name: 'Health', color: 'var(--cat-health)', keywords: [
+    'EAGLE EYE CENTRE', 'EAGLE EYE',
+    'ATA MEDICAL', 'GUARDIAN', 'WATSONS',
+    'SIN KANG TCM', 'LEE SURGERY',
+    'RAFFLES MEDICAL', 'RAFFLES HEALTH', 'PARKWAY',
+    'POLYCLINIC', 'DENTAL', 'PHYSIO', 'PHARMACY', 'CLINIC', 'HOSPITAL',
+    'HEALTHWAY', 'SINGHEALTH',
+  ]},
+  { name: 'Shopping', color: 'var(--cat-shopping)', keywords: [
+    'SHOPEE', 'LAZADA', 'AMAZON', 'TAOBAO', 'ALIEXPRESS',
+    'UNIQLO', 'ZARA', 'H&M', 'COTTON ON',
+    'COURTS', 'BEST DENKI', 'CHALLENGER', 'POPULAR',
+    'DECATHLON', 'IKEA', 'MUJI', 'DAISO', 'MINISO',
+    'GADGETMIX', 'SHOPLINE', 'SPUTNIK',
+    'CAROUSELL', 'QOOL', 'QTEN', 'SHOPEEPAY',
+    'DUBAI DUTY FREE',
+    'JR EAST SHOPPING', 'KRIS SHOP',
+  ]},
+  { name: 'Travel', color: 'var(--cat-travel)', keywords: [
+    'FLYSCOOT', 'SCOOT', 'ZIPAIR', 'AIRASIA', 'SINGAPORE AIR', 'SIA ',
+    'JETSTAR', 'CATHAY',
+    'BOOKING.COM', 'AGODA', 'EXPEDIA', 'KLOOK',
+    'HOTEL', 'HOSTEL', 'HYATT', 'CROWN PLAZA', 'MIRAL EXPERIENCES',
+    'CATCH TABLE', 'NAVITIME TRAVEL', 'SYUNRANNOYADOSAKAEYA',
+    'AIRLINES', 'AIRPORT',
+    'USCUSTOMS ESTA',
+    'EKSIM BAY', 'SEOULTEUKBYEOLSI',
+  ]},
+  { name: 'Entertainment', color: 'var(--cat-entertainment)', keywords: [
+    'TICKETMASTER', 'LYRIC THEATRE', 'KULTURE HOUSE', 'THE LOUNGE LLC',
+    'MPDSSG', 'SINGAPORE618',
+  ]},
+  { name: 'Services', color: 'var(--cat-uncategorized)', keywords: [
+    'LAUNDRYHEAP',
+  ]},
+];
+
+const ALL_CATEGORY_NAMES = [...CATEGORIES.map(c => c.name), 'Uncategorized'];
+
+const CATEGORY_COLORS = {};
+CATEGORIES.forEach(c => CATEGORY_COLORS[c.name] = c.color);
+CATEGORY_COLORS['Uncategorized'] = 'var(--cat-uncategorized)';
+
+// ── STATE ───────────────────────────────────
+
+let transactions = [];
+let fileNames = [];
+let parsedFiles = {}; // fileName -> raw parsed txs
+let dupeCount = 0;
+
+// ── CSV PARSER ──────────────────────────────
+// Handles two DBS formats:
+// 1. Credit card: Transaction Date, Transaction Posting Date, Transaction Description, Transaction Type, Payment Type, Transaction Status, Debit Amount, Credit Amount
+// 2. Bank account: Transaction Date, Transaction Code, Description, Transaction Ref1, Transaction Ref2, Transaction Ref3, Status, Debit Amount, Credit Amount
+
+function parseCSV(text) {
+  const lines = text.trim().split(/\r?\n/);
+  if (lines.length < 2) return [];
+
+  // Find header row (scan first 10 lines)
+  let headerIdx = -1;
+  for (let i = 0; i < Math.min(lines.length, 10); i++) {
+    if (lines[i].toLowerCase().includes('transaction date')) {
+      headerIdx = i;
+      break;
+    }
+  }
+  if (headerIdx === -1) return [];
+
+  const headers = parseCSVLine(lines[headerIdx]).map(h => h.trim().toLowerCase());
+
+  // Detect format
+  const isCreditCard = headers.some(h => h.includes('transaction description'));
+  const isBankAccount = headers.some(h => h.includes('transaction code') || h.includes('description'));
+
+  const dateCol = headers.findIndex(h => h === 'transaction date');
+  const debitCol = headers.findIndex(h => h.includes('debit'));
+  const creditCol = headers.findIndex(h => h.includes('credit'));
+
+  // Credit card specific
+  const descCol = headers.findIndex(h => h === 'transaction description');
+  const typeCol = headers.findIndex(h => h === 'transaction type');
+
+  // Bank account specific
+  const bankDescCol = headers.findIndex(h => h === 'description');
+  const ref1Col = headers.findIndex(h => h.includes('ref1'));
+  const ref2Col = headers.findIndex(h => h.includes('ref2'));
+  const ref3Col = headers.findIndex(h => h.includes('ref3'));
+  const codeCol = headers.findIndex(h => h === 'transaction code');
+
+  const result = [];
+  for (let i = headerIdx + 1; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+
+    const cols = parseCSVLine(line);
+    const dateStr = (cols[dateCol] || '').trim();
+    const debit = parseFloat(String(cols[debitCol] || '').replace(/[",]/g, '')) || 0;
+    const credit = parseFloat(String(cols[creditCol] || '').replace(/[",]/g, '')) || 0;
+
+    let merchant = '';
+    let txType = '';
+
+    if (isCreditCard && descCol >= 0) {
+      merchant = (cols[descCol] || '').trim();
+      txType = (cols[typeCol] || '').trim();
+    } else {
+      // Bank account: combine description + refs
+      merchant = [cols[bankDescCol], cols[ref1Col], cols[ref2Col], cols[ref3Col]]
+        .filter(Boolean).map(s => s.trim()).filter(s => s).join(' ');
+      txType = (cols[codeCol] || '').trim();
+    }
+
+    const date = parseDDBSDate(dateStr);
+    if (!date || (!debit && !credit)) continue;
+
+    // Skip payment transactions (bill payments, card payments)
+    const upperMerchant = merchant.toUpperCase();
+    const upperType = txType.toUpperCase();
+    if (upperType === 'PAYMENT' || upperType === 'BILL') continue;
+    if (upperMerchant.includes('BILL PAYMENT') || upperMerchant.includes('PAYMENT VIA') || upperMerchant.includes('PAYMENT - DBS')) continue;
+
+    // Bank interest earned — label properly
+    if (upperType === 'INT' && credit > 0) {
+      merchant = 'Interest Earned';
+    }
+
+    const isCredit = credit > 0 && debit === 0;
+    const category = isCredit ? 'Refund' : categorize(merchant);
+    const isTransfer = category === 'Transfer';
+
+    result.push({
+      id: 0, // reassigned after dedup
+      date,
+      dateStr,
+      merchant: merchant || '(unknown)',
+      txType,
+      debit,
+      credit,
+      isCredit,
+      isTransfer,
+      amount: debit || credit,
+      category,
+      // Dedup key: date + merchant + amount
+      _key: dateStr + '|' + merchant + '|' + (debit || credit),
+    });
+  }
+
+  return result;
+}
+
+function parseCSVLine(line) {
+  const result = [];
+  let current = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (inQuotes) {
+      if (ch === '"' && line[i + 1] === '"') {
+        current += '"';
+        i++;
+      } else if (ch === '"') {
+        inQuotes = false;
+      } else {
+        current += ch;
+      }
+    } else {
+      if (ch === '"') {
+        inQuotes = true;
+      } else if (ch === ',') {
+        result.push(current);
+        current = '';
+      } else {
+        current += ch;
+      }
+    }
+  }
+  result.push(current);
+  return result;
+}
+
+function parseDDBSDate(str) {
+  if (!str) return null;
+  const months = { jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5, jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11 };
+  const m = str.match(/(\d{1,2})\s+(\w{3})\s+(\d{4})/);
+  if (!m) return null;
+  const month = months[m[2].toLowerCase()];
+  if (month === undefined) return null;
+  return new Date(parseInt(m[3]), month, parseInt(m[1]));
+}
+
+// ── UOB XLS PARSER ──────────────────────────
+// Handles two UOB formats:
+// 1. Debit card: Transaction Date, Posting Date, Description, Foreign Currency Type, Transaction Amount(Foreign), Local Currency Type, Transaction Amount(Local)
+// 2. One Account: Transaction Date, Transaction Description, Withdrawal, Deposit, Available Balance
+
+function parseUOBXls(data) {
+  const wb = XLSX.read(data, { type: 'array' });
+  const sheet = wb.Sheets[wb.SheetNames[0]];
+  const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true, defval: '' });
+
+  // Find header row
+  let headerIdx = -1;
+  for (let i = 0; i < Math.min(rows.length, 15); i++) {
+    const row = rows[i].map(c => String(c).trim().toLowerCase());
+    if (row.some(c => c.includes('transaction date'))) {
+      headerIdx = i;
+      break;
+    }
+  }
+  if (headerIdx === -1) return [];
+
+  const headers = rows[headerIdx].map(c => String(c).trim().toLowerCase());
+  const isDebitCard = headers.some(h => h.includes('posting date'));
+  const isOneAccount = headers.some(h => h.includes('withdrawal'));
+
+  const result = [];
+
+  for (let i = headerIdx + 1; i < rows.length; i++) {
+    const row = rows[i];
+    if (!row || !row.length) continue;
+
+    const dateStr = String(row[0] || '').trim();
+    const date = parseDDBSDate(dateStr); // Same DD Mon YYYY format
+    if (!date) continue;
+
+    let merchant = '';
+    let debit = 0;
+    let credit = 0;
+
+    if (isDebitCard) {
+      // UOB Debit Card format
+      const rawDesc = String(row[2] || '').trim();
+      // Clean up: remove "Ref No: ..." lines, collapse whitespace
+      merchant = rawDesc.replace(/\n?Ref No:.*$/s, '').replace(/\s+/g, ' ').trim();
+      const amount = parseFloat(String(row[6] || '0').replace(/[",]/g, '')) || 0;
+      if (amount > 0) debit = amount;
+      else if (amount < 0) credit = Math.abs(amount);
+      else continue;
+    } else if (isOneAccount) {
+      // UOB One Account format
+      const rawDesc = String(row[1] || '').trim();
+      // Clean up multi-line description: take meaningful parts
+      const lines = rawDesc.split('\n').map(l => l.trim()).filter(l => l);
+      merchant = lines.join(' ').replace(/\s+/g, ' ').trim();
+      const withdrawal = parseFloat(String(row[2] || '0').replace(/[",]/g, '')) || 0;
+      const deposit = parseFloat(String(row[3] || '0').replace(/[",]/g, '')) || 0;
+      if (withdrawal > 0) debit = withdrawal;
+      else if (deposit > 0) credit = deposit;
+      else continue;
+    } else {
+      continue;
+    }
+
+    // Skip card fees that are waived (net zero)
+    const upperMerchant = merchant.toUpperCase();
+    if (upperMerchant.includes('CARD MEMBERSHIP FEE') || upperMerchant.includes('ANNUAL CARD FEE IS WAIVED')) continue;
+
+    // Interest earned
+    if (upperMerchant.includes('INTEREST CREDIT')) {
+      merchant = 'Interest Earned';
+    }
+
+    const isCredit = credit > 0 && debit === 0;
+    const category = isCredit ? 'Refund' : categorize(merchant);
+    const isTransfer = category === 'Transfer';
+
+    result.push({
+      id: 0,
+      date,
+      dateStr,
+      merchant: merchant || '(unknown)',
+      txType: isDebitCard ? 'UOB Debit' : 'UOB Account',
+      debit,
+      credit,
+      isCredit,
+      isTransfer,
+      amount: debit || credit,
+      category,
+      _key: dateStr + '|' + merchant + '|' + (debit || credit),
+    });
+  }
+
+  return result;
+}
+
+// ── CATEGORIZER ─────────────────────────────
+
+function categorize(merchant) {
+  const upper = merchant.toUpperCase();
+  // For PAYNOW-FAST: check recipient against all non-Transfer categories first
+  // Only fall back to Transfer if no specific category matches
+  if (upper.includes('PAYNOW-FAST')) {
+    for (const cat of CATEGORIES) {
+      if (cat.name === 'Transfer') continue;  // skip Transfer for now
+      for (const kw of cat.keywords) {
+        if (upper.includes(kw.toUpperCase())) return cat.name;
+      }
+    }
+    return 'Transfer';  // default: it's a personal PayNow transfer
+  }
+  for (const cat of CATEGORIES) {
+    for (const kw of cat.keywords) {
+      if (upper.includes(kw.toUpperCase())) return cat.name;
+    }
+  }
+  return 'Uncategorized';
+}
+
+// ── MERGE & DEDUP ───────────────────────────
+// Only deduplicates ACROSS files, not within.
+// If the same key appears 2x in file A and 1x in file B,
+// file A keeps both, file B's copy is the dupe.
+
+function mergeAllFiles() {
+  const allTxs = [];
+  let dupes = 0;
+
+  // Build a map of key -> count per file (preserves within-file duplicates)
+  // Then cross-file: if key already seen from another file, it's a dupe
+  const keyFileCount = {}; // key -> { fileName: count }
+
+  const fileEntries = Object.entries(parsedFiles);
+  fileEntries.forEach(([fileName, txs]) => {
+    txs.forEach(tx => {
+      if (!keyFileCount[tx._key]) keyFileCount[tx._key] = {};
+      keyFileCount[tx._key][fileName] = (keyFileCount[tx._key][fileName] || 0) + 1;
+    });
+  });
+
+  // For each file, track how many of each key we've emitted
+  const emittedPerKey = {}; // key -> total emitted count
+  const budgetPerKey = {};  // key -> max allowed (max count in any single file)
+
+  for (const [key, fileCounts] of Object.entries(keyFileCount)) {
+    budgetPerKey[key] = Math.max(...Object.values(fileCounts));
+  }
+
+  fileEntries.forEach(([fileName, txs]) => {
+    txs.forEach(tx => {
+      const emitted = emittedPerKey[tx._key] || 0;
+      const budget = budgetPerKey[tx._key] || 0;
+      if (emitted < budget) {
+        allTxs.push(tx);
+        emittedPerKey[tx._key] = emitted + 1;
+      } else {
+        dupes++;
+      }
+    });
+  });
+
+  // Sort by date descending
+  allTxs.sort((a, b) => b.date - a.date);
+
+  // Reassign IDs
+  allTxs.forEach((tx, i) => tx.id = i);
+
+  dupeCount = dupes;
+  transactions = allTxs;
+}
+
+// ── HELPERS ─────────────────────────────────
+
+function formatAmount(n) {
+  return 'S$' + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+}
+
+function formatDate(d) {
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  return d.getDate().toString().padStart(2, '0') + ' ' + months[d.getMonth()] + ' ' + d.getFullYear();
+}
+
+function monthKey(d) {
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+}
+
+function monthLabel(key) {
+  const [y, m] = key.split('-');
+  const months = ['JANUARY', 'FEBRUARY', 'MARCH', 'APRIL', 'MAY', 'JUNE', 'JULY', 'AUGUST', 'SEPTEMBER', 'OCTOBER', 'NOVEMBER', 'DECEMBER'];
+  return months[parseInt(m) - 1] + ' ' + y;
+}
+
+function escapeHtml(s) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// ── GROUP BY MONTH ──────────────────────────
+
+function groupByMonth(txs) {
+  const groups = {};
+  txs.forEach(tx => {
+    const key = monthKey(tx.date);
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(tx);
+  });
+  return Object.entries(groups).sort((a, b) => b[0].localeCompare(a[0]));
+}
+
+// ── RENDER FILE CHIPS ───────────────────────
+
+function renderFileChips() {
+  const container = document.getElementById('file-chips');
+  container.innerHTML = Object.entries(parsedFiles).map(([name, txs]) => `
+    <div class="file-chip">
+      <span>${escapeHtml(name)}</span>
+      <span class="chip-count">${txs.length}</span>
+      <span class="chip-remove" data-file="${escapeHtml(name)}">&times;</span>
+    </div>
+  `).join('');
+
+  container.querySelectorAll('.chip-remove').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const file = btn.dataset.file;
+      delete parsedFiles[file];
+      fileNames = fileNames.filter(f => f !== file);
+      mergeAllFiles();
+      renderFileChips();
+      if (transactions.length > 0) {
+        renderPreview(transactions);
+      } else {
+        document.getElementById('preview-section').classList.remove('visible');
+      }
+    });
+  });
+}
+
+// ── RENDER PREVIEW ──────────────────────────
+
+function renderPreview(txs) {
+  const tbody = document.getElementById('preview-body');
+  tbody.innerHTML = txs.slice(0, 150).map(tx => `
+    <tr>
+      <td>${escapeHtml(tx.dateStr)}</td>
+      <td>${escapeHtml(tx.merchant)}</td>
+      <td style="color:var(--muted)">${escapeHtml(tx.txType)}</td>
+      <td class="amount-debit">${tx.debit ? formatAmount(tx.debit) : ''}</td>
+      <td class="amount-credit">${tx.credit ? formatAmount(tx.credit) : ''}</td>
+      <td style="color: ${CATEGORY_COLORS[tx.category] || 'var(--muted)'}">${escapeHtml(tx.category)}</td>
+    </tr>
+  `).join('');
+
+  document.getElementById('tx-count').textContent = txs.length;
+  document.getElementById('dupe-count').textContent = dupeCount;
+  document.getElementById('preview-section').classList.add('visible');
+}
+
+// ── RENDER MONTHLY BREAKDOWN ────────────────
+
+function renderMonthly() {
+  const container = document.getElementById('tab-monthly');
+  const debits = transactions.filter(tx => !tx.isCredit && !tx.isTransfer);
+  const transfers = transactions.filter(tx => tx.isTransfer);
+  const credits = transactions.filter(tx => tx.isCredit);
+  const months = groupByMonth(debits);
+
+  let html = '';
+
+  months.forEach(([key, txs]) => {
+    const total = txs.reduce((s, tx) => s + tx.amount, 0);
+    const catTotals = {};
+
+    txs.forEach(tx => {
+      catTotals[tx.category] = (catTotals[tx.category] || 0) + tx.amount;
+    });
+
+    const sorted = Object.entries(catTotals).sort((a, b) => b[1] - a[1]);
+    const maxAmount = sorted.length ? sorted[0][1] : 0;
+
+    html += `<div class="month-block fade-in">`;
+    html += `<div class="month-header">`;
+    html += `<span>${monthLabel(key)}</span>`;
+    html += `<span class="month-total">${formatAmount(total)}</span>`;
+    html += `</div>`;
+
+    sorted.forEach(([cat, amount]) => {
+      const pct = total > 0 ? Math.round((amount / total) * 100) : 0;
+      const barLen = maxAmount > 0 ? Math.max(1, Math.round((amount / maxAmount) * 20)) : 0;
+      const bar = '\u2588'.repeat(barLen);
+      const color = CATEGORY_COLORS[cat] || 'var(--muted)';
+      const catTxs = txs.filter(tx => tx.category === cat);
+      const catId = key + '-' + cat.replace(/[^a-zA-Z]/g, '');
+
+      html += `<div class="category-row" data-catid="${catId}">`;
+      html += `<span class="cat-indicator" style="background:${color}"></span>`;
+      html += `<span class="category-name">${escapeHtml(cat)}</span>`;
+      html += `<span class="category-amount">${formatAmount(amount)}</span>`;
+      html += `<span class="category-pct">${pct}%</span>`;
+      html += `<span class="category-bar" style="color:${color}">${bar}</span>`;
+      html += `</div>`;
+
+      html += `<div class="transactions-list" id="txlist-${catId}">`;
+      catTxs.sort((a, b) => b.date - a.date).forEach(tx => {
+        html += `<div class="transaction-row">`;
+        html += `<span class="tx-date">${formatDate(tx.date)}</span>`;
+        html += `<span class="tx-merchant">${escapeHtml(tx.merchant)}</span>`;
+        html += `<span class="tx-amount">${formatAmount(tx.amount)}</span>`;
+        html += `<select class="tx-category-select" data-id="${tx.id}">`;
+        ALL_CATEGORY_NAMES.forEach(c => {
+          html += `<option value="${escapeHtml(c)}"${c === tx.category ? ' selected' : ''}>${escapeHtml(c)}</option>`;
+        });
+        html += `</select>`;
+        html += `</div>`;
+      });
+      html += `</div>`;
+    });
+
+    // Transfers for this month (outgoing)
+    const monthTransfersOut = transfers.filter(tx => monthKey(tx.date) === key && !tx.isCredit);
+    if (monthTransfersOut.length > 0) {
+      const transferTotal = monthTransfersOut.reduce((s, tx) => s + tx.amount, 0);
+      html += `<div class="transfers-section">`;
+      html += `<div class="transfers-header">Transfers &middot; ${formatAmount(transferTotal)}</div>`;
+      monthTransfersOut.forEach(tx => {
+        html += `<div class="transfer-row">`;
+        html += `<span class="tx-date">${formatDate(tx.date)}</span>`;
+        html += `<span class="tx-merchant">${escapeHtml(tx.merchant)}</span>`;
+        html += `<span class="tx-amount">${formatAmount(tx.amount)}</span>`;
+        html += `</div>`;
+      });
+      html += `</div>`;
+    }
+
+    // Credits for this month (refunds + incoming transfers)
+    const monthCredits = credits.filter(tx => monthKey(tx.date) === key);
+    const monthTransfersIn = transfers.filter(tx => monthKey(tx.date) === key && tx.isCredit);
+    const allCredits = [...monthCredits, ...monthTransfersIn].sort((a, b) => b.date - a.date);
+    if (allCredits.length > 0) {
+      const creditTotal = allCredits.reduce((s, tx) => s + tx.amount, 0);
+      html += `<div class="credits-section">`;
+      html += `<div class="credits-header">Refunds / Cashback &middot; ${formatAmount(creditTotal)}</div>`;
+      allCredits.forEach(tx => {
+        html += `<div class="credit-row">`;
+        html += `<span class="tx-date">${formatDate(tx.date)}</span>`;
+        html += `<span class="tx-merchant">${escapeHtml(tx.merchant)}</span>`;
+        html += `<span class="tx-amount">+${formatAmount(tx.amount)}</span>`;
+        html += `</div>`;
+      });
+      html += `</div>`;
+    }
+
+    html += `</div>`;
+  });
+
+  if (!months.length) {
+    html = '<div class="empty-state">No transactions found.</div>';
+  }
+
+  container.innerHTML = html;
+
+  // Drill-down click handlers
+  container.querySelectorAll('.category-row').forEach(row => {
+    row.addEventListener('click', () => {
+      const catId = row.dataset.catid;
+      const list = document.getElementById('txlist-' + catId);
+      if (list) list.classList.toggle('expanded');
+    });
+  });
+
+  // Re-categorization handlers
+  container.querySelectorAll('.tx-category-select').forEach(select => {
+    select.addEventListener('change', (e) => {
+      e.stopPropagation();
+      const id = parseInt(select.dataset.id);
+      const tx = transactions.find(t => t.id === id);
+      if (tx) {
+        tx.category = select.value;
+        tx.isTransfer = tx.category === 'Transfer';
+        renderAll();
+        saveToLocalStorage(); // key already cached from Analyze
+      }
+    });
+    select.addEventListener('click', (e) => e.stopPropagation());
+  });
+}
+
+// ── RENDER SUMMARY ──────────────────────────
+
+function renderSummary() {
+  const container = document.getElementById('tab-summary');
+  const debits = transactions.filter(tx => !tx.isCredit && !tx.isTransfer);
+  const months = groupByMonth(debits);
+
+  if (!months.length) {
+    container.innerHTML = '<div class="empty-state">No data to summarize.</div>';
+    return;
+  }
+
+  const totalSpend = debits.reduce((s, tx) => s + tx.amount, 0);
+  const avgMonthly = totalSpend / months.length;
+  const transfersOut = transactions.filter(tx => tx.isTransfer && !tx.isCredit);
+  const totalTransfers = transfersOut.reduce((s, tx) => s + tx.amount, 0);
+
+  let highestMonth = months[0];
+  months.forEach(([key, txs]) => {
+    const t = txs.reduce((s, tx) => s + tx.amount, 0);
+    const ht = highestMonth[1].reduce((s, tx) => s + tx.amount, 0);
+    if (t > ht) highestMonth = [key, txs];
+  });
+  const highestTotal = highestMonth[1].reduce((s, tx) => s + tx.amount, 0);
+
+  // Top categories
+  const catTotals = {};
+  debits.forEach(tx => {
+    catTotals[tx.category] = (catTotals[tx.category] || 0) + tx.amount;
+  });
+  const topCats = Object.entries(catTotals).sort((a, b) => b[1] - a[1]).slice(0, 5);
+
+  let html = '';
+
+  // Stats grid
+  html += `<div class="summary-grid fade-in">`;
+  html += `<div class="stat-block"><div class="stat-label">Total Spend</div><div class="stat-value">${formatAmount(totalSpend)}</div><div class="stat-sub">${months.length} month${months.length > 1 ? 's' : ''}</div></div>`;
+  html += `<div class="stat-block"><div class="stat-label">Monthly Average</div><div class="stat-value">${formatAmount(avgMonthly)}</div><div class="stat-sub">per month</div></div>`;
+  html += `<div class="stat-block"><div class="stat-label">Highest Month</div><div class="stat-value">${formatAmount(highestTotal)}</div><div class="stat-sub">${monthLabel(highestMonth[0])}</div></div>`;
+  html += `<div class="stat-block"><div class="stat-label">Transfers Out</div><div class="stat-value">${formatAmount(totalTransfers)}</div><div class="stat-sub">${transfersOut.length} transactions</div></div>`;
+  html += `</div>`;
+
+  // Top categories
+  html += `<div class="section-header">Top Categories</div>`;
+  html += `<div class="top-categories fade-in">`;
+  topCats.forEach(([cat, amount], i) => {
+    const pct = totalSpend > 0 ? Math.round((amount / totalSpend) * 100) : 0;
+    const barLen = Math.max(1, Math.round((amount / topCats[0][1]) * 30));
+    const bar = '\u2588'.repeat(barLen);
+    const color = CATEGORY_COLORS[cat] || 'var(--muted)';
+    html += `<div class="category-row" style="cursor:default">`;
+    html += `<span class="rank" style="color:var(--muted)">${i + 1}.</span>`;
+    html += `<span class="category-name">${escapeHtml(cat)}</span>`;
+    html += `<span class="category-amount">${formatAmount(amount)}</span>`;
+    html += `<span class="category-pct">${pct}%</span>`;
+    html += `<span class="category-bar" style="color:${color}">${bar}</span>`;
+    html += `</div>`;
+  });
+  html += `</div>`;
+
+  // Monthly table
+  html += `<div style="margin-top:2rem"><div class="section-header">Monthly Totals</div>`;
+  html += `<table class="summary-table fade-in"><thead><tr><th>Month</th><th># Txns</th><th>Total</th></tr></thead><tbody>`;
+  months.forEach(([key, txs]) => {
+    const t = txs.reduce((s, tx) => s + tx.amount, 0);
+    const isHighest = key === highestMonth[0];
+    html += `<tr${isHighest ? ' class="highlight"' : ''}>`;
+    html += `<td>${monthLabel(key)}</td>`;
+    html += `<td>${txs.length}</td>`;
+    html += `<td>${formatAmount(t)}</td>`;
+    html += `</tr>`;
+  });
+  html += `</tbody></table></div>`;
+
+  container.innerHTML = html;
+}
+
+// ── RENDER RECURRING ────────────────────────
+
+function renderRecurring() {
+  const container = document.getElementById('tab-recurring');
+  const debits = transactions.filter(tx => !tx.isCredit && !tx.isTransfer);
+
+  // Normalize merchant names for grouping
+  function normalizeMerchant(merchant) {
+    const upper = merchant.toUpperCase();
+    if (/GRAB\*\s*A-/.test(upper) || /GRAB\*\s*L/.test(upper)) return 'GRAB FOOD';
+    if (/GRAB RIDES/.test(upper)) return 'GRAB RIDES';
+    if (/GRAB-EC/.test(upper)) return 'GRAB FOOD (MY)';
+    if (/GOOGLE\*YOUTUBE/.test(upper)) return 'YOUTUBE PREMIUM';
+    if (/APPLE\.COM\/BILL/.test(upper)) return 'APPLE SUBSCRIPTIONS';
+    if (/GOMO MOBILE/.test(upper)) return 'GOMO MOBILE';
+    if (/CLAUDE\.AI/.test(upper)) return 'CLAUDE PRO';
+    // Split Prudential by policy number: 75027699 is the monthly life plan
+    if (/PRUDENTIAL\s*75027699/.test(upper)) return 'PRUDENTIAL LIFE PLAN';
+    if (/PRUDENTIAL/.test(upper)) return 'PRUDENTIAL (OTHER)';
+    if (/FWD SINGAPORE/.test(upper)) return 'FWD INSURANCE';
+    if (/EAGLE EYE CENTRE/.test(upper) || /01EAGLE EYE/.test(upper) || /001EAGLE EYE/.test(upper)) return 'EAGLE EYE CENTRE';
+    if (/BUS\/MRT/.test(upper)) return 'BUS/MRT';
+    if (/WWW\.TADA/.test(upper)) return 'TADA';
+    if (/UBER RIDES/.test(upper)) return 'UBER';
+    if (/CAREEM RIDE/.test(upper)) return 'CAREEM RIDE';
+    if (/CAREEM FOOD/.test(upper)) return 'CAREEM FOOD';
+    if (/MTA\*NYCT/.test(upper)) return 'NYC METRO';
+    if (/X CORP/.test(upper)) return 'X PREMIUM';
+    if (/KOO KEE/.test(upper)) return 'KOO KEE';
+    if (/NTUC FAIRPRICE/.test(upper) || /FAIRPRICE/.test(upper)) return 'FAIRPRICE';
+    if (/IRAS ITX/.test(upper)) return 'IRAS INCOME TAX';
+    if (/IRAS PROPERTY/.test(upper)) return 'IRAS PROPERTY TAX';
+    if (/MARSILING/.test(upper)) return 'TOWN COUNCIL (S&CC)';
+    return upper.replace(/\s+(SINGAPORE|SG|MY|KR|AE|US|TW|JP|IE|CA|GB|IN)\s*$/i, '').trim().split(/\s+/).slice(0, 3).join(' ');
+  }
+
+  const merchantMonths = {};
+  debits.forEach(tx => {
+    const normalized = normalizeMerchant(tx.merchant);
+    if (!merchantMonths[normalized]) {
+      merchantMonths[normalized] = { months: new Set(), amounts: [], rawName: normalized, category: tx.category };
+    }
+    merchantMonths[normalized].months.add(monthKey(tx.date));
+    merchantMonths[normalized].amounts.push(tx.amount);
+  });
+
+  // Only show truly recurring: must be in a subscription/bill/instalment category
+  // AND appear in 2+ months. Excludes variable spending (food, transport, groceries, etc.)
+  // Also exclude Apple (variable app purchases, not a subscription) and one-off policies.
+  const RECURRING_CATEGORIES = new Set(['Subscriptions', 'Insurance', 'Tax & Bills', 'Health']);
+  const RECURRING_EXCLUDE = new Set(['APPLE SUBSCRIPTIONS', 'PRUDENTIAL (OTHER)', 'FWD INSURANCE']);
+
+  const recurring = Object.entries(merchantMonths)
+    .filter(([name, data]) => {
+      if (data.months.size < 2) return false;
+      if (RECURRING_EXCLUDE.has(name)) return false;
+      return RECURRING_CATEGORIES.has(data.category);
+    })
+    .map(([key, data]) => ({
+      name: data.rawName,
+      category: data.category,
+      monthCount: data.months.size,
+      avgMonthly: data.amounts.reduce((s, a) => s + a, 0) / data.months.size,
+      totalSpend: data.amounts.reduce((s, a) => s + a, 0),
+    }))
+    .sort((a, b) => b.avgMonthly - a.avgMonthly);
+
+  if (!recurring.length) {
+    container.innerHTML = '<div class="empty-state">No recurring charges detected. Need 2+ months of data.</div>';
+    return;
+  }
+
+  const totalMonthly = recurring.reduce((s, r) => s + r.avgMonthly, 0);
+
+  let html = '<div class="fade-in">';
+
+  recurring.forEach(r => {
+    const color = CATEGORY_COLORS[r.category] || 'var(--muted)';
+    html += `<div class="recurring-card">`;
+    html += `<div class="recurring-merchant">${escapeHtml(r.name)}<div class="recurring-category" style="color:${color}">${escapeHtml(r.category)}</div></div>`;
+    html += `<div class="recurring-freq">${r.monthCount} months</div>`;
+    html += `<div class="recurring-cost"><div class="recurring-monthly">${formatAmount(r.avgMonthly)}/mo</div><div class="recurring-annual">${formatAmount(r.avgMonthly * 12)}/yr</div></div>`;
+    html += `</div>`;
+  });
+
+  html += `<div class="recurring-total">`;
+  html += `<span class="recurring-total-label">Total Recurring</span>`;
+  html += `<span><span class="recurring-total-amount">${formatAmount(totalMonthly)}/mo</span><span class="recurring-total-annual">${formatAmount(totalMonthly * 12)}/yr</span></span>`;
+  html += `</div>`;
+
+  html += '</div>';
+  container.innerHTML = html;
+}
+
+// ── RENDER ALL ──────────────────────────────
+
+function renderAll() {
+  renderMonthly();
+  renderSummary();
+  renderRecurring();
+}
+
+// ── SHOW DASHBOARD ──────────────────────────
+
+function showDashboard() {
+  document.getElementById('upload-section').style.display = 'none';
+  document.getElementById('dashboard').classList.add('visible');
+  document.getElementById('file-name').textContent = fileNames.join(', ');
+  document.getElementById('dash-tx-count').textContent = transactions.length;
+  renderAll();
+}
+
+// ── ENCRYPTED LOCAL STORAGE ─────────────────
+
+const STORAGE_KEY = 'xian-expense-tracker-enc';
+const SALT_KEY = 'xian-expense-tracker-salt';
+let _derivedKey = null; // cached in memory for session
+
+function buf2hex(buf) {
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+function hex2buf(hex) {
+  const bytes = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < hex.length; i += 2) bytes[i / 2] = parseInt(hex.substr(i, 2), 16);
+  return bytes;
+}
+
+async function deriveKey(passphrase, salt) {
+  const enc = new TextEncoder();
+  const keyMaterial = await crypto.subtle.importKey('raw', enc.encode(passphrase), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey(
+    { name: 'PBKDF2', salt, iterations: 100000, hash: 'SHA-256' },
+    keyMaterial,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt']
+  );
+}
+
+async function encryptData(data, key) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const enc = new TextEncoder();
+  const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, enc.encode(JSON.stringify(data)));
+  return buf2hex(iv) + ':' + buf2hex(ciphertext);
+}
+
+async function decryptData(stored, key) {
+  const [ivHex, ctHex] = stored.split(':');
+  const iv = hex2buf(ivHex);
+  const ciphertext = hex2buf(ctHex);
+  const plainBuf = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ciphertext);
+  return JSON.parse(new TextDecoder().decode(plainBuf));
+}
+
+async function saveToLocalStorage() {
+  if (!_derivedKey) return;
+  try {
+    const data = {
+      fileNames,
+      transactions: transactions.map(tx => ({ ...tx, date: tx.date.toISOString() })),
+    };
+    const encrypted = await encryptData(data, _derivedKey);
+    localStorage.setItem(STORAGE_KEY, encrypted);
+  } catch (e) {
+    // silent fail — data stays in memory
+  }
+}
+
+async function loadFromLocalStorage(key) {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return false;
+    const data = await decryptData(raw, key);
+    if (!data.transactions || !data.transactions.length) return false;
+    fileNames = data.fileNames || [];
+    transactions = data.transactions.map(tx => ({ ...tx, date: new Date(tx.date) }));
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+// ── PASSPHRASE MODAL ────────────────────────
+
+const passphraseOverlay = document.getElementById('passphrase-overlay');
+const passphraseInput = document.getElementById('passphrase-input');
+const passphraseConfirm = document.getElementById('passphrase-confirm');
+const passphraseError = document.getElementById('passphrase-error');
+const passphraseSubmit = document.getElementById('passphrase-submit');
+const passphraseTitle = document.getElementById('passphrase-title');
+const passphraseDesc = document.getElementById('passphrase-desc');
+
+function showPassphraseModal(mode) {
+  passphraseOverlay.classList.add('visible');
+  passphraseInput.value = '';
+  passphraseConfirm.value = '';
+  passphraseError.textContent = '';
+
+  if (mode === 'unlock') {
+    passphraseTitle.textContent = 'UNLOCK DATA';
+    passphraseDesc.textContent = 'Enter your passphrase to decrypt saved transactions.';
+    passphraseConfirm.style.display = 'none';
+    passphraseSubmit.textContent = 'UNLOCK';
+  } else {
+    passphraseTitle.textContent = 'SET PASSPHRASE';
+    passphraseDesc.textContent = 'Choose a passphrase to encrypt your transaction data.';
+    passphraseConfirm.style.display = '';
+    passphraseSubmit.textContent = 'SAVE & ENCRYPT';
+  }
+
+  setTimeout(() => passphraseInput.focus(), 100);
+
+  return new Promise((resolve) => {
+    function submit() {
+      const pass = passphraseInput.value;
+      if (!pass || pass.length < 4) {
+        passphraseError.textContent = 'passphrase must be at least 4 characters';
+        return;
+      }
+      if (mode === 'set' && pass !== passphraseConfirm.value) {
+        passphraseError.textContent = 'passphrases do not match';
+        return;
+      }
+      cleanup();
+      resolve(pass);
+    }
+    function onKey(e) { if (e.key === 'Enter') submit(); }
+    function cleanup() {
+      passphraseSubmit.removeEventListener('click', submit);
+      passphraseInput.removeEventListener('keydown', onKey);
+      passphraseConfirm.removeEventListener('keydown', onKey);
+      passphraseOverlay.classList.remove('visible');
+    }
+    passphraseSubmit.addEventListener('click', submit);
+    passphraseInput.addEventListener('keydown', onKey);
+    passphraseConfirm.addEventListener('keydown', onKey);
+  });
+}
+
+// ── AUTO-RESTORE ON PAGE LOAD ───────────────
+
+(async function autoRestore() {
+  const hasSaved = localStorage.getItem(STORAGE_KEY);
+  if (!hasSaved) return;
+
+  const saltHex = localStorage.getItem(SALT_KEY);
+  if (!saltHex) return;
+  const salt = hex2buf(saltHex);
+
+  const passphrase = await showPassphraseModal('unlock');
+  const key = await deriveKey(passphrase, salt);
+
+  const ok = await loadFromLocalStorage(key);
+  if (ok) {
+    _derivedKey = key;
+    showDashboard();
+  } else {
+    passphraseOverlay.classList.add('visible');
+    passphraseError.textContent = 'wrong passphrase — try again';
+    passphraseInput.value = '';
+    // Re-show modal on failure
+    const retry = await showPassphraseModal('unlock');
+    const key2 = await deriveKey(retry, salt);
+    const ok2 = await loadFromLocalStorage(key2);
+    if (ok2) {
+      _derivedKey = key2;
+      showDashboard();
+    } else {
+      // Give up, show upload screen
+      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(SALT_KEY);
+    }
+  }
+})();
+
+// Called before first save to get passphrase
+async function ensurePassphrase() {
+  if (_derivedKey) return;
+  const passphrase = await showPassphraseModal('set');
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  localStorage.setItem(SALT_KEY, buf2hex(salt));
+  _derivedKey = await deriveKey(passphrase, salt);
+}
+
+// ── EVENT HANDLERS ──────────────────────────
+
+const dropZone = document.getElementById('drop-zone');
+const fileInput = document.getElementById('file-input');
+
+dropZone.addEventListener('dragover', (e) => {
+  e.preventDefault();
+  dropZone.classList.add('dragover');
+});
+
+dropZone.addEventListener('dragleave', () => {
+  dropZone.classList.remove('dragover');
+});
+
+dropZone.addEventListener('drop', (e) => {
+  e.preventDefault();
+  dropZone.classList.remove('dragover');
+  handleFiles(e.dataTransfer.files);
+});
+
+fileInput.addEventListener('change', () => {
+  if (fileInput.files.length) handleFiles(fileInput.files);
+});
+
+function handleFiles(fileList) {
+  const files = Array.from(fileList).filter(f =>
+    f.name.endsWith('.csv') || f.name.endsWith('.xls') || f.name.endsWith('.xlsx')
+  );
+  if (!files.length) return;
+
+  let loaded = 0;
+  files.forEach(file => {
+    const isXls = file.name.endsWith('.xls') || file.name.endsWith('.xlsx');
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      let txs;
+      if (isXls) {
+        const data = new Uint8Array(e.target.result);
+        txs = parseUOBXls(data);
+      } else {
+        txs = parseCSV(e.target.result);
+      }
+      if (txs.length > 0) {
+        parsedFiles[file.name] = txs;
+        if (!fileNames.includes(file.name)) fileNames.push(file.name);
+      }
+      loaded++;
+      if (loaded === files.length) {
+        mergeAllFiles();
+        renderFileChips();
+        if (transactions.length > 0) {
+          renderPreview(transactions);
+        }
+      }
+    };
+    if (isXls) {
+      reader.readAsArrayBuffer(file);
+    } else {
+      reader.readAsText(file);
+    }
+  });
+}
+
+// Preview buttons
+document.getElementById('btn-cancel').addEventListener('click', () => {
+  transactions = [];
+  parsedFiles = {};
+  fileNames = [];
+  dupeCount = 0;
+  document.getElementById('preview-section').classList.remove('visible');
+  document.getElementById('file-chips').innerHTML = '';
+  fileInput.value = '';
+});
+
+document.getElementById('btn-analyze').addEventListener('click', async () => {
+  showDashboard();
+  await ensurePassphrase();
+  await saveToLocalStorage();
+});
+
+// New file
+document.getElementById('btn-new').addEventListener('click', () => {
+  transactions = [];
+  parsedFiles = {};
+  fileNames = [];
+  dupeCount = 0;
+  localStorage.removeItem(STORAGE_KEY);
+  localStorage.removeItem(SALT_KEY);
+  _derivedKey = null;
+  document.getElementById('dashboard').classList.remove('visible');
+  document.getElementById('upload-section').style.display = '';
+  document.getElementById('preview-section').classList.remove('visible');
+  document.getElementById('file-chips').innerHTML = '';
+  fileInput.value = '';
+});
+
+// Tab navigation
+document.querySelectorAll('.nav-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('visible'));
+    tab.classList.add('active');
+    document.getElementById('tab-' + tab.dataset.tab).classList.add('visible');
+  });
+});
+</script>
+</body>
+</html>
