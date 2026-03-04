@@ -1045,10 +1045,13 @@ const CATEGORIES = [
   ]},
 ];
 
-const ALL_CATEGORY_NAMES = [...CATEGORIES.map(c => c.name), 'Uncategorized'];
+const ALL_CATEGORY_NAMES = [...CATEGORIES.map(c => c.name), 'Refund', 'Uncategorized'];
 
 const CATEGORY_COLORS = {};
-CATEGORIES.forEach(c => CATEGORY_COLORS[c.name] = c.color);
+CATEGORIES.forEach(c => {
+  CATEGORY_COLORS[c.name] = c.color;
+  c._upper = c.keywords.map(kw => kw.toUpperCase());
+});
 CATEGORY_COLORS['Uncategorized'] = 'var(--cat-uncategorized)';
 
 // ── STATE ───────────────────────────────────
@@ -1135,25 +1138,7 @@ function parseCSV(text) {
       merchant = 'Interest Earned';
     }
 
-    const isCredit = credit > 0 && debit === 0;
-    const category = isCredit ? 'Refund' : categorize(merchant);
-    const isTransfer = category === 'Transfer';
-
-    result.push({
-      id: 0, // reassigned after dedup
-      date,
-      dateStr,
-      merchant: merchant || '(unknown)',
-      txType,
-      debit,
-      credit,
-      isCredit,
-      isTransfer,
-      amount: debit || credit,
-      category,
-      // Dedup key: date + merchant + amount
-      _key: dateStr + '|' + merchant + '|' + (debit || credit),
-    });
+    result.push(buildTransaction(date, dateStr, merchant, txType, debit, credit));
   }
 
   return result;
@@ -1271,24 +1256,8 @@ function parseUOBXls(data) {
       merchant = 'Interest Earned';
     }
 
-    const isCredit = credit > 0 && debit === 0;
-    const category = isCredit ? 'Refund' : categorize(merchant);
-    const isTransfer = category === 'Transfer';
-
-    result.push({
-      id: 0,
-      date,
-      dateStr,
-      merchant: merchant || '(unknown)',
-      txType: isDebitCard ? 'UOB Debit' : 'UOB Account',
-      debit,
-      credit,
-      isCredit,
-      isTransfer,
-      amount: debit || credit,
-      category,
-      _key: dateStr + '|' + merchant + '|' + (debit || credit),
-    });
+    const txType = isDebitCard ? 'UOB Debit' : 'UOB Account';
+    result.push(buildTransaction(date, dateStr, merchant, txType, debit, credit));
   }
 
   return result;
@@ -1302,16 +1271,16 @@ function categorize(merchant) {
   // Only fall back to Transfer if no specific category matches
   if (upper.includes('PAYNOW-FAST')) {
     for (const cat of CATEGORIES) {
-      if (cat.name === 'Transfer') continue;  // skip Transfer for now
-      for (const kw of cat.keywords) {
-        if (upper.includes(kw.toUpperCase())) return cat.name;
+      if (cat.name === 'Transfer') continue;
+      for (const kw of cat._upper) {
+        if (upper.includes(kw)) return cat.name;
       }
     }
-    return 'Transfer';  // default: it's a personal PayNow transfer
+    return 'Transfer';
   }
   for (const cat of CATEGORIES) {
-    for (const kw of cat.keywords) {
-      if (upper.includes(kw.toUpperCase())) return cat.name;
+    for (const kw of cat._upper) {
+      if (upper.includes(kw)) return cat.name;
     }
   }
   return 'Uncategorized';
@@ -1394,6 +1363,24 @@ function escapeHtml(s) {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+// ── SHARED HELPERS ──────────────────────────
+
+function getDebits() { return transactions.filter(tx => !tx.isCredit && !tx.isTransfer); }
+function sumAmounts(txs) { return txs.reduce((s, tx) => s + tx.amount, 0); }
+
+function buildTransaction(date, dateStr, merchant, txType, debit, credit) {
+  merchant = merchant || '(unknown)';
+  const isCredit = credit > 0 && debit === 0;
+  const category = isCredit ? 'Refund' : categorize(merchant);
+  const isTransfer = category === 'Transfer';
+  return {
+    id: 0, date, dateStr, merchant, txType,
+    debit, credit, isCredit, isTransfer,
+    amount: debit || credit, category,
+    _key: dateStr + '|' + merchant + '|' + (debit || credit) + '|' + (credit > 0 ? 'CR' : 'DR'),
+  };
+}
+
 // ── GROUP BY MONTH ──────────────────────────
 
 function groupByMonth(txs) {
@@ -1458,7 +1445,7 @@ function renderPreview(txs) {
 
 function renderMonthly() {
   const container = document.getElementById('tab-monthly');
-  const debits = transactions.filter(tx => !tx.isCredit && !tx.isTransfer);
+  const debits = getDebits();
   const transfers = transactions.filter(tx => tx.isTransfer);
   const credits = transactions.filter(tx => tx.isCredit);
   const months = groupByMonth(debits);
@@ -1587,7 +1574,7 @@ function renderMonthly() {
 
 function renderSummary() {
   const container = document.getElementById('tab-summary');
-  const debits = transactions.filter(tx => !tx.isCredit && !tx.isTransfer);
+  const debits = getDebits();
   const months = groupByMonth(debits);
 
   if (!months.length) {
@@ -1601,12 +1588,11 @@ function renderSummary() {
   const totalTransfers = transfersOut.reduce((s, tx) => s + tx.amount, 0);
 
   let highestMonth = months[0];
+  let highestTotal = 0;
   months.forEach(([key, txs]) => {
     const t = txs.reduce((s, tx) => s + tx.amount, 0);
-    const ht = highestMonth[1].reduce((s, tx) => s + tx.amount, 0);
-    if (t > ht) highestMonth = [key, txs];
+    if (t > highestTotal) { highestMonth = [key, txs]; highestTotal = t; }
   });
-  const highestTotal = highestMonth[1].reduce((s, tx) => s + tx.amount, 0);
 
   // Top categories
   const catTotals = {};
@@ -1664,7 +1650,7 @@ function renderSummary() {
 
 function renderRecurring() {
   const container = document.getElementById('tab-recurring');
-  const debits = transactions.filter(tx => !tx.isCredit && !tx.isTransfer);
+  const debits = getDebits();
 
   // Normalize merchant names for grouping
   function normalizeMerchant(merchant) {
@@ -1853,11 +1839,11 @@ const passphraseSubmit = document.getElementById('passphrase-submit');
 const passphraseTitle = document.getElementById('passphrase-title');
 const passphraseDesc = document.getElementById('passphrase-desc');
 
-function showPassphraseModal(mode) {
+function showPassphraseModal(mode, errorMsg) {
   passphraseOverlay.classList.add('visible');
   passphraseInput.value = '';
   passphraseConfirm.value = '';
-  passphraseError.textContent = '';
+  passphraseError.textContent = errorMsg || '';
 
   if (mode === 'unlock') {
     passphraseTitle.textContent = 'UNLOCK DATA';
@@ -1910,30 +1896,19 @@ function showPassphraseModal(mode) {
   if (!saltHex) return;
   const salt = hex2buf(saltHex);
 
-  const passphrase = await showPassphraseModal('unlock');
-  const key = await deriveKey(passphrase, salt);
-
-  const ok = await loadFromLocalStorage(key);
-  if (ok) {
-    _derivedKey = key;
-    showDashboard();
-  } else {
-    passphraseOverlay.classList.add('visible');
-    passphraseError.textContent = 'wrong passphrase — try again';
-    passphraseInput.value = '';
-    // Re-show modal on failure
-    const retry = await showPassphraseModal('unlock');
-    const key2 = await deriveKey(retry, salt);
-    const ok2 = await loadFromLocalStorage(key2);
-    if (ok2) {
-      _derivedKey = key2;
+  let errorMsg = '';
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const passphrase = await showPassphraseModal('unlock', errorMsg);
+    const key = await deriveKey(passphrase, salt);
+    const ok = await loadFromLocalStorage(key);
+    if (ok) {
+      _derivedKey = key;
       showDashboard();
-    } else {
-      // Give up, show upload screen
-      localStorage.removeItem(STORAGE_KEY);
-      localStorage.removeItem(SALT_KEY);
+      return;
     }
+    errorMsg = 'wrong passphrase — try again';
   }
+  // After 5 failures, just show upload screen (data stays encrypted in localStorage)
 })();
 
 // Called before first save to get passphrase
@@ -2009,15 +1984,17 @@ function handleFiles(fileList) {
 }
 
 // Preview buttons
-document.getElementById('btn-cancel').addEventListener('click', () => {
+function resetState() {
   transactions = [];
   parsedFiles = {};
   fileNames = [];
   dupeCount = 0;
   document.getElementById('preview-section').classList.remove('visible');
-  document.getElementById('file-chips').innerHTML = '';
+  document.getElementById('file-chips').textContent = '';
   fileInput.value = '';
-});
+}
+
+document.getElementById('btn-cancel').addEventListener('click', resetState);
 
 document.getElementById('btn-analyze').addEventListener('click', async () => {
   showDashboard();
@@ -2027,18 +2004,12 @@ document.getElementById('btn-analyze').addEventListener('click', async () => {
 
 // New file
 document.getElementById('btn-new').addEventListener('click', () => {
-  transactions = [];
-  parsedFiles = {};
-  fileNames = [];
-  dupeCount = 0;
+  resetState();
   localStorage.removeItem(STORAGE_KEY);
   localStorage.removeItem(SALT_KEY);
   _derivedKey = null;
   document.getElementById('dashboard').classList.remove('visible');
   document.getElementById('upload-section').style.display = '';
-  document.getElementById('preview-section').classList.remove('visible');
-  document.getElementById('file-chips').innerHTML = '';
-  fileInput.value = '';
 });
 
 // Tab navigation
